@@ -82,7 +82,7 @@ fun insnString (insn) {
                    fi
 
     | M (x)    -> x
-    | L (i)    -> sprintf ("$%d", makeBox(i))
+    | L (i)    -> sprintf ("$%d", i)
     | I (0, x) -> sprintf ("(%s)", opndString (x))
     | I (n, x) -> sprintf ("%d(%s)", n, opndString (x))
     esac
@@ -466,7 +466,7 @@ fun toFixedNum (r) {
 
 fun fromFixedNum(x) {
   printf("From fixed num: %s\n", x.string);
-  singletonBuffer (Sal1 (x))
+  singletonBuffer (Sar1 (x))
 }
 
 -- Compiles stack machine code into a list of x86 instructions. Takes an environment
@@ -588,7 +588,7 @@ fun compile(env, code) {
           | ST (x) -> [env, code <+> move(peek(env), env.loc(x))]
           | CONST (n) -> 
               case env.allocate of 
-                [s, env] -> [env, code <+ Mov (L(n), s)]
+                [s, env] -> [env, code <+ Mov (L(makeBox(n)), s)]
               esac
           | BINOP (op) -> 
             case env.pop2 of 
@@ -622,7 +622,12 @@ fun compile(env, code) {
         --         of [s, env] -> [env, code <+ Lea(loc(env, x), s)]
         --       esac
         | STI -> case pop2(env) of
-            [v, r, env] -> [push(env, v), code <+> move(v, I(0, r))]
+            [v, r, env] -> [push(env, v), code <+> 
+                      if memOpnd (r)
+                        then singletonBuffer (Mov (v, edx)) <+ Mov (r, eax) <+ Mov (edx, I (0, eax)) <+ Mov (edx, r)
+                        else singletonBuffer (Mov (v, eax)) <+ Mov (eax, I (0, r)) <+ Mov (eax, r)
+                      fi
+            ]
           esac 
         | DROP -> case pop(env) of 
             [_, env] -> [env, code]
